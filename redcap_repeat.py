@@ -27,6 +27,7 @@ import copy
 import json
 import logging
 # New comment
+import tempfile
 from optparse import OptionParser
 from collections import defaultdict
 from string import Template
@@ -719,15 +720,15 @@ def find_group(lines):
 
 def main(input_file, output_file):
 
-    temp_file = os.tmpfile() 
+    temp_file = tempfile.TemporaryFile("w+", encoding="utf-8")
     if type(input_file) is str:
-       handle_in = open(input_file, 'rU')
-       handle_out = open(output_file, 'wb')
+       handle_in = open(input_file, 'r', encoding="utf-8")
+       handle_out = open(output_file, 'w', encoding="utf-8", newline='')
     else:
        handle_in = input_file
        handle_out = output_file
 
-    input_f = csv.reader(handle_in)
+    input_f = csv.reader(handle_in, quotechar='"', delimiter=",", quoting=csv.QUOTE_ALL)
     output_f = csv.writer(temp_file)
 
     # this is the preprocessor 
@@ -739,13 +740,15 @@ def main(input_file, output_file):
     handle_in.close()
     
     input_f = csv.reader(temp_file)
-    output_f = csv.writer(handle_out)
+    output_f = csv.writer(handle_out, delimiter=",", quotechar='"', quoting=csv.QUOTE_ALL)
 
     # now handle repeating groups
     outer_group=[]
     group = []
     depth = 0
     for line in input_f:
+        if not line:
+            continue
         startmatch = begin.match(line[key['a']])
         endmatch = end.match(line[key['a']])
 
@@ -762,6 +765,7 @@ def main(input_file, output_file):
         if depth == 0 and len(group):
             logger.debug("Found group %s, length - %d" % (group[0][key['a']], len(group)))
             for row in repeat_group(group, parent_group = outer_group):
+                print(row)
                 output_f.writerow(row)
             group = []
 
@@ -788,7 +792,7 @@ if __name__ == "__main__":
     (options, args) = parser.parse_args()
 
     if options.auto and options.prompt:
-        print "--prompt_add and --auto_add are mutually exclusive. Please choose one. See --help for more details."
+        print("--prompt_add and --auto_add are mutually exclusive. Please choose one. See --help for more details.")
         sys.exit()
     if options.debug:
         logger.setLevel(logging.DEBUG)
